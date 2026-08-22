@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:latest
     ports:
-      - "5432:5432"
+      - "5433:5432"
     restart: always
     environment:
       POSTGRES_PASSWORD: changemeinprod!
@@ -20,6 +20,10 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: "http://localhost:5173"
+      KC_HOSTNAME_ADMIN: "http://localhost:9090"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
     volumes:
       - keycloak-data:/opt/keycloak/data
     command:
