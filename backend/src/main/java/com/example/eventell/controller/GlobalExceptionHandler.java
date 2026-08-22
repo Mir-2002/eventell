@@ -1,6 +1,9 @@
 package com.example.eventell.controller;
 
 import com.example.eventell.domain.dto.ErrorDto;
+import com.example.eventell.exception.EventNotFoundException;
+import com.example.eventell.exception.EventUpdateException;
+import com.example.eventell.exception.TicketTypeNotFoundException;
 import com.example.eventell.exception.UserNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
@@ -18,6 +21,30 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(EventUpdateException.class)
+    public ResponseEntity<ErrorDto> eventUpdateException(EventUpdateException exception) {
+        log.error("Caught EventUpdateException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("Unable to update event");
+        return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(TicketTypeNotFoundException.class)
+    public ResponseEntity<ErrorDto> ticketTypeNotFoundException(TicketTypeNotFoundException exception) {
+        log.error("Caught TicketTypeNotFoundException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("Ticket type not found");
+        return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(EventNotFoundException.class)
+    public ResponseEntity<ErrorDto> eventNotFoundException(EventNotFoundException exception) {
+        log.error("Caught EventNotFoundException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("Event not found");
+        return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
 
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ErrorDto> userNotFoundException(UserNotFoundException exception) {
