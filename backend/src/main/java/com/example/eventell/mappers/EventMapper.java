@@ -2,6 +2,8 @@ package com.example.eventell.mappers;
 
 import com.example.eventell.domain.CreateEventRequest;
 import com.example.eventell.domain.CreateTicketTypeRequest;
+import com.example.eventell.domain.UpdateEventRequest;
+import com.example.eventell.domain.UpdateTicketTypeRequest;
 import com.example.eventell.domain.dto.CreateEventRequestDto;
 import com.example.eventell.domain.dto.CreateEventResponseDto;
 import com.example.eventell.domain.dto.CreateTicketTypeRequestDto;
@@ -10,6 +12,10 @@ import com.example.eventell.domain.dto.GetEventDetailsResponseDto;
 import com.example.eventell.domain.dto.GetEventTicketTypesResponseDto;
 import com.example.eventell.domain.dto.ListEventResponseDto;
 import com.example.eventell.domain.dto.ListEventTicketTypeResponseDto;
+import com.example.eventell.domain.dto.UpdateEventRequestDto;
+import com.example.eventell.domain.dto.UpdateEventResponseDto;
+import com.example.eventell.domain.dto.UpdateTicketTypeRequestDto;
+import com.example.eventell.domain.dto.UpdateTicketTypeResponseDto;
 import com.example.eventell.domain.entities.Event;
 import com.example.eventell.domain.entities.TicketType;
 import org.mapstruct.Mapper;
@@ -31,4 +37,12 @@ public interface EventMapper {
     GetEventTicketTypesResponseDto toGetEventTicketTypesResponseDto(TicketType ticketType);
 
     GetEventDetailsResponseDto  toGetEventDetailsResponseDto(Event event);
+
+    UpdateTicketTypeRequest fromDto(UpdateTicketTypeRequestDto dto);
+
+    UpdateEventRequest fromDto(UpdateEventRequestDto dto);
+
+    UpdateTicketTypeResponseDto toUpdateTicketTypeResponseDto(TicketType ticketType);
+
+    UpdateEventResponseDto toUpdateEventResponseDto(Event event);
 }

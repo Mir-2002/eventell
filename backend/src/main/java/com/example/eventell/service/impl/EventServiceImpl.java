@@ -84,7 +84,7 @@ public class EventServiceImpl implements EventService {
             throw new EventUpdateException("Event id not found");
         }
 
-        if(id.equals(event.getId())){
+        if(!id.equals(event.getId())){
             throw new EventUpdateException("Cannot update the ID of an event");
         }
 

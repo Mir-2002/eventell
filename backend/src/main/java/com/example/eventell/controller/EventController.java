@@ -1,10 +1,13 @@
 package com.example.eventell.controller;
 
 import com.example.eventell.domain.CreateEventRequest;
+import com.example.eventell.domain.UpdateEventRequest;
 import com.example.eventell.domain.dto.CreateEventRequestDto;
 import com.example.eventell.domain.dto.CreateEventResponseDto;
 import com.example.eventell.domain.dto.GetEventDetailsResponseDto;
 import com.example.eventell.domain.dto.ListEventResponseDto;
+import com.example.eventell.domain.dto.UpdateEventRequestDto;
+import com.example.eventell.domain.dto.UpdateEventResponseDto;
 import com.example.eventell.domain.entities.Event;
 import com.example.eventell.mappers.EventMapper;
 import com.example.eventell.service.EventService;
@@ -20,6 +23,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -65,6 +69,19 @@ public class EventController {
             .map(eventMapper::toGetEventDetailsResponseDto)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping(path = "/{eventId}")
+    public ResponseEntity<UpdateEventResponseDto> updateEvent(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable UUID eventId,
+        @Valid @RequestBody UpdateEventRequestDto updateEventRequestDto) {
+        UpdateEventRequest updateEventRequest = eventMapper.fromDto(updateEventRequestDto);
+        UUID userId = parseUserId(jwt);
+        Event updatedEvent = eventService.updateEventForOrganizer(userId, eventId, updateEventRequest);
+
+        UpdateEventResponseDto updateEventResponseDto = eventMapper.toUpdateEventResponseDto(updatedEvent);
+        return ResponseEntity.ok(updateEventResponseDto);
     }
 
     private UUID parseUserId(Jwt jwt){
