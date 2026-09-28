@@ -15,4 +15,6 @@ public interface QrCodeRepository extends JpaRepository<QrCode, UUID> {
         UUID purchaserId,
         QrCodeStatusEnum status
     );
+
+    Optional<QrCode> findByValueAndStatus(String value, QrCodeStatusEnum status);
 }

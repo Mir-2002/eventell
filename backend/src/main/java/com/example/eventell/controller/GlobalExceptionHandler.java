@@ -2,18 +2,19 @@ package com.example.eventell.controller;
 
 import com.example.eventell.domain.dto.ErrorDto;
 import com.example.eventell.exception.EventNotFoundException;
+import com.example.eventell.exception.EventUpdateException;
 import com.example.eventell.exception.QrCodeGenerationException;
 import com.example.eventell.exception.QrCodeNotFoundException;
 import com.example.eventell.exception.TicketNotFoundException;
-import com.example.eventell.exception.TicketsSoldOutException;
-import com.example.eventell.exception.EventUpdateException;
 import com.example.eventell.exception.TicketTypeNotFoundException;
+import com.example.eventell.exception.TicketsSoldOutException;
 import com.example.eventell.exception.UserNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -115,6 +116,14 @@ public class GlobalExceptionHandler {
                 .map(violation -> violation.getPropertyPath() +  ": " + violation.getMessage()).orElse("ConstraintViolation occured");
 
         errorDto.setError(errorMessage);
+        return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorDto> handleMessageNotReadable(HttpMessageNotReadableException exception) {
+        log.error("Caught HttpMessageNotReadableException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("Malformed request body");
         return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
     }
 
