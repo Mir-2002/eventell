@@ -145,6 +145,24 @@ class EventServiceImplTest {
             .isInstanceOf(EventNotFoundException.class);
     }
 
+    @Test
+    void deleteEventDeletesOwnedEvent() {
+        when(eventRepository.findByIdAndOrganizerId(eventId, organizerId)).thenReturn(Optional.of(existingEvent));
+
+        eventService.deleteEventForOrganizer(organizerId, eventId);
+
+        verify(eventRepository).delete(existingEvent);
+    }
+
+    @Test
+    void deleteEventIgnoresEventNotOwnedByOrganizer() {
+        when(eventRepository.findByIdAndOrganizerId(eventId, organizerId)).thenReturn(Optional.empty());
+
+        eventService.deleteEventForOrganizer(organizerId, eventId);
+
+        verify(eventRepository, never()).delete(any());
+    }
+
     private UpdateEventRequest updateRequest(UUID id, List<UpdateTicketTypeRequest> ticketTypes) {
         UpdateEventRequest request = new UpdateEventRequest();
         request.setId(id);
