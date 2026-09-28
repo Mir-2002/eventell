@@ -57,6 +57,7 @@ public class TicketType {
     private Event event;
 
     @OneToMany(mappedBy = "type", cascade = CascadeType.ALL)
+    @Builder.Default
     private List<Ticket> tickets = new ArrayList<>();
 
     @CreatedDate

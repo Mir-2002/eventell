@@ -13,6 +13,7 @@ import com.example.eventell.exception.UserNotFoundException;
 import com.example.eventell.repository.EventRepository;
 import com.example.eventell.repository.UserRepository;
 import com.example.eventell.service.EventService;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +35,7 @@ public class EventServiceImpl implements EventService {
     private final EventRepository eventRepository;
 
     @Override
+    @Transactional
     public Event createEvent(UUID organizerId, CreateEventRequest event) {
         User organizer = userRepository.findById(organizerId).orElseThrow(
             () -> new UserNotFoundException(
@@ -49,6 +51,7 @@ public class EventServiceImpl implements EventService {
             return ticketTypeToCreate;
         }).collect(Collectors.toList());
         Event eventToCreate = new Event();
+        ticketTypesToCreate.forEach(ticketType -> ticketType.setEvent(eventToCreate));
         eventToCreate.setName(event.getName());
         eventToCreate.setStart(event.getStart());
         eventToCreate.setEnd(event.getEnd());
@@ -63,16 +66,19 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<Event> listEventsForOrganizer(UUID organizerId, Pageable pageable) {
         return eventRepository.findByOrganizerId(organizerId, pageable);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Event> getEventForOrganizer(UUID organizerId, UUID id) {
-        return eventRepository.findByIdandOrganizerId(id, organizerId);
+        return eventRepository.findByIdAndOrganizerId(id, organizerId);
     }
 
     @Override
+    @Transactional
     public Event updateEventForOrganizer(UUID organizerId, UUID id, UpdateEventRequest event) {
         if(event.getId() == null){
             throw new EventUpdateException("Event id not found");
@@ -82,7 +88,7 @@ public class EventServiceImpl implements EventService {
             throw new EventUpdateException("Cannot update the ID of an event");
         }
 
-        Event existingEvent = eventRepository.findByIdandOrganizerId(id, organizerId)
+        Event existingEvent = eventRepository.findByIdAndOrganizerId(id, organizerId)
             .orElseThrow(() -> new EventNotFoundException(String.format("Event with ID '%s' doesn't exist'", id)));
 
         existingEvent.setName(event.getName());
@@ -109,6 +115,7 @@ public class EventServiceImpl implements EventService {
 
         for(UpdateTicketTypeRequest ticketType :  event.getTicketTypes()){
             if(ticketType.getId() == null){
+                // Create
                 TicketType ticketTypeToCreate = new TicketType();
                 ticketTypeToCreate.setName(ticketType.getName());
                 ticketTypeToCreate.setPrice(ticketType.getPrice());
@@ -117,6 +124,7 @@ public class EventServiceImpl implements EventService {
                 ticketTypeToCreate.setEvent(existingEvent);
                 existingEvent.getTicketTypes().add(ticketTypeToCreate);
             } else if (existingTicketTypesIndex.containsKey(ticketType.getId())) {
+                // Update
                 TicketType existingTicketType = existingTicketTypesIndex.get(ticketType.getId());
                 existingTicketType.setName(ticketType.getName());
                 existingTicketType.setPrice(ticketType.getPrice());
