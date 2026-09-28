@@ -6,6 +6,8 @@ services:
     restart: always
     environment:
       POSTGRES_PASSWORD: changemeinprod!
+    volumes:
+      - postgres-data:/var/lib/postgresql
 
   adminer:
     image: adminer:latest
@@ -33,4 +35,6 @@ services:
       - --import-realm
 volumes:
   keycloak-data:
+    driver: local
+  postgres-data:
     driver: local
