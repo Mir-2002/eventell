@@ -2,6 +2,10 @@ package com.example.eventell.controller;
 
 import com.example.eventell.domain.dto.ErrorDto;
 import com.example.eventell.exception.EventNotFoundException;
+import com.example.eventell.exception.QrCodeGenerationException;
+import com.example.eventell.exception.QrCodeNotFoundException;
+import com.example.eventell.exception.TicketNotFoundException;
+import com.example.eventell.exception.TicketsSoldOutException;
 import com.example.eventell.exception.EventUpdateException;
 import com.example.eventell.exception.TicketTypeNotFoundException;
 import com.example.eventell.exception.UserNotFoundException;
@@ -52,6 +56,38 @@ public class GlobalExceptionHandler {
         ErrorDto errorDto = new ErrorDto();
         errorDto.setError("User not found");
         return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(TicketsSoldOutException.class)
+    public ResponseEntity<ErrorDto> ticketsSoldOutException(TicketsSoldOutException exception) {
+        log.error("Caught TicketsSoldOutException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("Tickets are sold out for this ticket type");
+        return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(TicketNotFoundException.class)
+    public ResponseEntity<ErrorDto> ticketNotFoundException(TicketNotFoundException exception) {
+        log.error("Caught TicketNotFoundException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("Ticket not found");
+        return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(QrCodeNotFoundException.class)
+    public ResponseEntity<ErrorDto> qrCodeNotFoundException(QrCodeNotFoundException exception) {
+        log.error("Caught QrCodeNotFoundException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("QR code not found");
+        return new ResponseEntity<>(errorDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(QrCodeGenerationException.class)
+    public ResponseEntity<ErrorDto> qrCodeGenerationException(QrCodeGenerationException exception) {
+        log.error("Caught QrCodeGenerationException", exception);
+        ErrorDto errorDto = new ErrorDto();
+        errorDto.setError("Unable to generate QR code");
+        return new ResponseEntity<>(errorDto, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
