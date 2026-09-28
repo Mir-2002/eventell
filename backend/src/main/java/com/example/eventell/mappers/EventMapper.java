@@ -10,8 +10,11 @@ import com.example.eventell.domain.dto.CreateTicketTypeRequestDto;
 import com.example.eventell.domain.dto.CreateTicketTypeResponseDto;
 import com.example.eventell.domain.dto.GetEventDetailsResponseDto;
 import com.example.eventell.domain.dto.GetEventTicketTypesResponseDto;
+import com.example.eventell.domain.dto.GetPublishedEventDetailsResponseDto;
+import com.example.eventell.domain.dto.GetPublishedEventDetailsTicketTypesResponseDto;
 import com.example.eventell.domain.dto.ListEventResponseDto;
 import com.example.eventell.domain.dto.ListEventTicketTypeResponseDto;
+import com.example.eventell.domain.dto.ListPublishedEventResponseDto;
 import com.example.eventell.domain.dto.UpdateEventRequestDto;
 import com.example.eventell.domain.dto.UpdateEventResponseDto;
 import com.example.eventell.domain.dto.UpdateTicketTypeRequestDto;
@@ -45,4 +48,10 @@ public interface EventMapper {
     UpdateTicketTypeResponseDto toUpdateTicketTypeResponseDto(TicketType ticketType);
 
     UpdateEventResponseDto toUpdateEventResponseDto(Event event);
+
+    ListPublishedEventResponseDto toListPublishedEventResponseDto(Event event);
+
+    GetPublishedEventDetailsTicketTypesResponseDto toGetPublishedEventDetailsTicketTypesResponseDto(TicketType ticketType);
+
+    GetPublishedEventDetailsResponseDto toGetPublishedEventDetailsResponseDto(Event event);
 }

@@ -4,6 +4,7 @@ import com.example.eventell.domain.CreateEventRequest;
 import com.example.eventell.domain.UpdateEventRequest;
 import com.example.eventell.domain.UpdateTicketTypeRequest;
 import com.example.eventell.domain.entities.Event;
+import com.example.eventell.domain.entities.EventStatusEnum;
 import com.example.eventell.domain.entities.TicketType;
 import com.example.eventell.domain.entities.User;
 import com.example.eventell.exception.EventNotFoundException;
@@ -142,5 +143,23 @@ public class EventServiceImpl implements EventService {
     @Transactional
     public void deleteEventForOrganizer(UUID organizerId, UUID id) {
         getEventForOrganizer(organizerId, id).ifPresent(eventRepository::delete);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Event> listPublishedEvents(Pageable pageable) {
+        return eventRepository.findByStatus(EventStatusEnum.PUBLISHED, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Event> searchPublishedEvents(String query, Pageable pageable) {
+        return eventRepository.searchEvents(EventStatusEnum.PUBLISHED, query, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Event> getPublishedEvent(UUID id) {
+        return eventRepository.findByIdAndStatus(id, EventStatusEnum.PUBLISHED);
     }
 }

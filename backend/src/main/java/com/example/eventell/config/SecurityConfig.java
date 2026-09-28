@@ -18,7 +18,7 @@ public class SecurityConfig {
         UserProvisioningFilter userProvisioningFilter,
         JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
-                .requestMatchers(HttpMethod.GET, "/api/v1/published-events/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/published-events/**").permitAll()
                 .requestMatchers("/api/v1/events/*/ticket-types/*/tickets").hasRole("ATTENDEE")
                 .requestMatchers("/api/v1/events/**").hasRole("ORGANIZER")
                 .requestMatchers("/api/v1/tickets/**").hasRole("ATTENDEE")
