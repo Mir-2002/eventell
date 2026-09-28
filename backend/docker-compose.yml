@@ -26,9 +26,11 @@ services:
       KC_HTTP_ENABLED: "true"
     volumes:
       - keycloak-data:/opt/keycloak/data
+      - ./keycloak:/opt/keycloak/data/import:ro
     command:
       - start-dev
       - --db=dev-file
+      - --import-realm
 volumes:
   keycloak-data:
     driver: local

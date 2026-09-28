@@ -1,0 +1,64 @@
+{
+  "realm": "eventell-app",
+  "enabled": true,
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "ROLE_ORGANIZER", "description": "Creates and manages events" },
+      { "name": "ROLE_ATTENDEE", "description": "Buys tickets for published events" },
+      { "name": "ROLE_STAFF", "description": "Validates tickets at events" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "eventell-app",
+      "name": "Eventell",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "/",
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "organizer",
+      "enabled": true,
+      "email": "organizer@eventell.local",
+      "emailVerified": true,
+      "firstName": "Olivia",
+      "lastName": "Organizer",
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["ROLE_ORGANIZER"]
+    },
+    {
+      "username": "attendee",
+      "enabled": true,
+      "email": "attendee@eventell.local",
+      "emailVerified": true,
+      "firstName": "Adam",
+      "lastName": "Attendee",
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["ROLE_ATTENDEE"]
+    },
+    {
+      "username": "staff",
+      "enabled": true,
+      "email": "staff@eventell.local",
+      "emailVerified": true,
+      "firstName": "Sam",
+      "lastName": "Staff",
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["ROLE_STAFF"]
+    }
+  ]
+}
