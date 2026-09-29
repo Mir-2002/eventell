@@ -3,13 +3,26 @@
   "enabled": true,
   "registrationAllowed": true,
   "loginWithEmailAllowed": true,
+  "loginTheme": "eventell",
   "roles": {
     "realm": [
       { "name": "ROLE_ORGANIZER", "description": "Creates and manages events" },
       { "name": "ROLE_ATTENDEE", "description": "Buys tickets for published events" },
-      { "name": "ROLE_STAFF", "description": "Validates tickets at events" }
+      { "name": "ROLE_STAFF", "description": "Validates tickets at events" },
+      { "name": "offline_access", "description": "${role_offline-access}" },
+      { "name": "uma_authorization", "description": "${role_uma_authorization}" },
+      {
+        "name": "default-roles-eventell-app",
+        "description": "Granted to every new user, including self-registered ones",
+        "composite": true,
+        "composites": {
+          "realm": ["offline_access", "uma_authorization", "ROLE_ATTENDEE"],
+          "client": { "account": ["view-profile", "manage-account"] }
+        }
+      }
     ]
   },
+  "defaultRole": { "name": "default-roles-eventell-app", "composite": true },
   "clients": [
     {
       "clientId": "eventell-app",
@@ -21,11 +34,11 @@
       "directAccessGrantsEnabled": true,
       "rootUrl": "http://localhost:5173",
       "baseUrl": "/",
-      "redirectUris": ["http://localhost:5173/*"],
-      "webOrigins": ["http://localhost:5173"],
+      "redirectUris": ["http://localhost:5173/*", "http://localhost:8080/*"],
+      "webOrigins": ["http://localhost:5173", "http://localhost:8080"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5173/*"
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://localhost:8080/*"
       }
     }
   ],
