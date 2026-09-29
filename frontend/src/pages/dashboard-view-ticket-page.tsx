@@ -1,151 +1,178 @@
+import DashboardLayout from "@/components/dashboard-layout";
+import PageState from "@/components/page-state";
+import StatusBadge from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { TicketDetails, TicketStatus } from "@/domain/domain";
-import { getTicket, getTicketQr } from "@/lib/api";
-import { format } from "date-fns";
-import { Calendar, DollarSign, MapPin, Tag } from "lucide-react";
+import { ApiError, getTicket, getTicketQr } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+import { formatDateRange, formatPrice } from "@/lib/format";
+import { ArrowLeft, Calendar, LoaderCircle, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
 const DashboardViewTicketPage: React.FC = () => {
   const [ticket, setTicket] = useState<TicketDetails | undefined>();
-  const [qrCodeUrl, setQrCodeUrl] = useState<string | undefined>();
-  const [isQrLoading, setIsQrCodeLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
+  const [isNotFound, setIsNotFound] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | undefined>();
+  const [qrError, setQrError] = useState<string | undefined>();
 
   const { id } = useParams();
-  const { isLoading, user } = useAuth();
+  const { user } = useAuth();
+  const accessToken = user?.access_token;
 
   useEffect(() => {
-    if (isLoading || !user?.access_token || !id) {
+    if (!accessToken || !id) {
       return;
     }
+    let cancelled = false;
+    let objectUrl: string | undefined;
 
-    const doUseEffect = async (accessToken: string, id: string) => {
+    const load = async () => {
       try {
-        setIsQrCodeLoading(true);
-        setError(undefined);
-
-        setTicket(await getTicket(accessToken, id));
-        setQrCodeUrl(URL.createObjectURL(await getTicketQr(accessToken, id)));
+        const ticketData = await getTicket(accessToken, id);
+        if (cancelled) return;
+        setTicket(ticketData);
       } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else if (typeof err === "string") {
-          setError(err);
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status < 500) {
+          setIsNotFound(true);
         } else {
-          setError("An unknown error has occurred");
+          setError(errorMessage(err));
         }
-      } finally {
-        setIsQrCodeLoading(false);
+        return;
+      }
+
+      try {
+        const blob = await getTicketQr(accessToken, id);
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setQrCodeUrl(objectUrl);
+      } catch (err) {
+        if (!cancelled) setQrError(errorMessage(err));
       }
     };
-
-    doUseEffect(user?.access_token, id);
+    load();
 
     return () => {
-      if (qrCodeUrl) {
-        URL.revokeObjectURL(qrCodeUrl);
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [user?.access_token, isLoading, id]);
+  }, [accessToken, id]);
 
-  const getStatusColor = (status: TicketStatus) => {
-    switch (status) {
-      case TicketStatus.PURCHASED:
-        return "text-green-400";
-      case TicketStatus.CANCELLED:
-        return "text-red-400";
-      default:
-        return "text-gray-400";
+  const renderBody = () => {
+    if (isNotFound) {
+      return (
+        <PageState
+          variant="empty"
+          title="We couldn't find that ticket"
+          action={
+            <Button asChild variant="outline">
+              <Link to="/dashboard/tickets">Back to your tickets</Link>
+            </Button>
+          }
+        />
+      );
     }
-  };
+    if (error) {
+      return <PageState variant="error" message={error} />;
+    }
+    if (!ticket) {
+      return <PageState />;
+    }
 
-  if (!ticket) {
-    return <p>Loading..</p>;
-  }
+    const isCancelled = ticket.status === TicketStatus.CANCELLED;
 
-  return (
-    <div className="bg-black min-h-screen text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="relative bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 rounded-3xl p-8 shadow-2xl">
-          {/* Status */}
-          <div className="bg-black/30 backdrop-blur-sm px-3 py-1 rounded-full mb-8 text-center">
-            <span
-              className={`text-sm font-medium ${getStatusColor(ticket.status)}`}
-            >
-              {ticket?.status}
-            </span>
+    return (
+      <Card className="mx-auto max-w-md gap-0 overflow-hidden py-0">
+        <div className="p-6 md:p-8">
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-3xl font-medium tracking-tight">
+              {ticket.eventName}
+            </h1>
+            <StatusBadge status={ticket.status} />
           </div>
-
-          <div className="mb-2">
-            <h1 className="text-2xl font-bold mb-2">{ticket.eventName}</h1>
-            <div className="flex items-center gap-2 text-purple-200">
-              <MapPin className="w-4" />
-              <span>{ticket.eventVenue}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-purple-300 mb-8">
-            <Calendar className="w-4 text-purple-200" />
-            <div>
-              {format(ticket.eventStart, "Pp")} -{" "}
-              {format(ticket.eventEnd, "Pp")}
-            </div>
-          </div>
-
-          <div className="flex justify-center mb-8">
-            <div className="bg-white p-4 rounded-2xl shadow-lg">
-              <div className="w-32 h-32 flex items-center justify-center">
-                {/* Loading */}
-                {isQrLoading && (
-                  <div className="text-xs text-center p2">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 mb-2 mx-auto"></div>
-                    <div className="text-gray-800">Loading QR...</div>
-                  </div>
-                )}
-                {/* error */}
-                {error && (
-                  <div className="text-red-400 text-sm text-center p-2">
-                    <div className="mb-1">⚠️</div>
-                    {error}
-                  </div>
-                )}
-                {/* Display QR */}
-                {qrCodeUrl && !isQrLoading && !error && (
-                  <img
-                    src={qrCodeUrl}
-                    alt="QR Code for event"
-                    className="w-full h-full object-contain rounded-large"
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center mb-8">
-            <p className="text-purple-200 text-sm">
-              Present this QR code at the venue for entry
+          <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
+            <p className="flex items-start gap-2">
+              <MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />
+              {ticket.eventVenue}
+            </p>
+            <p className="flex items-start gap-2">
+              <Calendar aria-hidden className="mt-0.5 size-4 shrink-0" />
+              {formatDateRange(ticket.eventStart, ticket.eventEnd)}
             </p>
           </div>
-
-          <div className="space-y-2 mb-8">
-            <div className="flex items-center gap-2">
-              <Tag className="w-5 text-purple-200" />
-              <span className="font-semibold">{ticket.description}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-5 text-purple-200" />
-              <span className="font-semibold">{ticket.price}</span>
-            </div>
-          </div>
-
-          <div className="text-center mb-2">
-            <h4 className="text-sm font-semibold font-mono">Ticket ID</h4>
-            <p className="text-purple-200 text-sm font-mono">{ticket.id}</p>
-          </div>
         </div>
-      </div>
-    </div>
+
+        {/* Perforation */}
+        <div aria-hidden className="relative h-6">
+          <span className="absolute top-1/2 -left-3 size-6 -translate-y-1/2 rounded-full bg-background" />
+          <span className="absolute top-1/2 left-6 right-6 border-t border-dashed border-stone-200" />
+          <span className="absolute top-1/2 -right-3 size-6 -translate-y-1/2 rounded-full bg-background" />
+        </div>
+
+        <div className="flex flex-col items-center gap-3 p-6 md:p-8">
+          <div className="rounded-[2rem] bg-sage p-5">
+            <div className="flex size-56 items-center justify-center overflow-hidden rounded-3xl bg-white">
+              {qrCodeUrl ? (
+                <img
+                  src={qrCodeUrl}
+                  alt="QR code for this ticket"
+                  className={isCancelled ? "size-full opacity-30" : "size-full"}
+                />
+              ) : qrError ? (
+                <p className="p-4 text-center text-sm text-danger">{qrError}</p>
+              ) : (
+                <LoaderCircle
+                  aria-label="Loading QR code"
+                  className="size-6 text-muted-foreground motion-safe:animate-spin"
+                />
+              )}
+            </div>
+          </div>
+          <p className="text-center text-sm text-muted-foreground">
+            {isCancelled
+              ? "This ticket was cancelled and can't be used."
+              : "Show this QR code at the venue to get in."}
+          </p>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-4 border-t border-stone-100 bg-stone-50 p-6 text-sm md:px-8">
+          <div>
+            <dt className="text-muted-foreground">Ticket</dt>
+            <dd className="mt-1 font-medium">
+              {ticket.description || "General admission"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Price</dt>
+            <dd className="mt-1 font-medium">{formatPrice(ticket.price)}</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-muted-foreground">Ticket id</dt>
+            <dd className="mt-1 font-mono text-xs break-all select-all">
+              {ticket.id}
+            </dd>
+          </div>
+        </dl>
+      </Card>
+    );
+  };
+
+  return (
+    <DashboardLayout>
+      <Button asChild variant="ghost" size="sm" className="mb-6">
+        <Link to="/dashboard/tickets">
+          <ArrowLeft />
+          Your tickets
+        </Link>
+      </Button>
+      {renderBody()}
+    </DashboardLayout>
   );
 };
 

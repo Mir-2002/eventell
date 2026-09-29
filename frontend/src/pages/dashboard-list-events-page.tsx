@@ -1,9 +1,10 @@
-import NavBar from "@/components/nav-bar";
+import DashboardLayout from "@/components/dashboard-layout";
+import PageState from "@/components/page-state";
 import { SimplePagination } from "@/components/simple-pagination";
+import StatusBadge from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -12,287 +13,239 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
-import {
-  EventSummary,
-  EventStatusEnum,
-  SpringBootPagination,
-} from "@/domain/domain";
+import { Card } from "@/components/ui/card";
+import { EventSummary, SpringBootPagination } from "@/domain/domain";
 import { deleteEvent, listEvents } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+import { formatDate, formatDateRange, formatPrice } from "@/lib/format";
 import {
   AlertCircle,
   Calendar,
   Clock,
-  Edit,
   MapPin,
+  Pencil,
+  Plus,
   Tag,
-  Trash,
+  Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { Link } from "react-router";
 
+const salesWindow = (eventItem: EventSummary) => {
+  const start = formatDate(eventItem.salesStart);
+  const end = formatDate(eventItem.salesEnd);
+  if (!start && !end) {
+    return "Sales open while published";
+  }
+  return `Sales ${start ?? "open now"} – ${end ?? "until the event"}`;
+};
+
 const DashboardListEventsPage: React.FC = () => {
-  const { isLoading, user } = useAuth();
+  const { user } = useAuth();
+  const accessToken = user?.access_token;
   const [events, setEvents] = useState<
     SpringBootPagination<EventSummary> | undefined
   >();
   const [error, setError] = useState<string | undefined>();
-  const [deleteEventError, setDeleteEventError] = useState<
-    string | undefined
-  >();
-
   const [page, setPage] = useState(0);
-  const [dialogOpen, setDialogOpen] = useState(false);
+
   const [eventToDelete, setEventToDelete] = useState<
     EventSummary | undefined
   >();
+  const [deleteEventError, setDeleteEventError] = useState<
+    string | undefined
+  >();
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    if (isLoading || !user?.access_token) {
+  const refreshEvents = useCallback(async () => {
+    if (!accessToken) {
       return;
     }
-    refreshEvents(user.access_token);
-  }, [isLoading, user, page]);
-
-  const refreshEvents = async (accessToken: string) => {
     try {
-      setEvents(await listEvents(accessToken, page));
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else if (typeof err === "string") {
-        setError(err);
-      } else {
-        setError("An unknown error has occurred");
+      const result = await listEvents(accessToken, page);
+      // Deleting the last event on a page leaves it empty; step back one
+      if (result.content.length === 0 && page > 0) {
+        setPage(page - 1);
+        return;
       }
+      setEvents(result);
+      setError(undefined);
+    } catch (err) {
+      setError(errorMessage(err));
     }
-  };
+  }, [accessToken, page]);
 
-  const formatDate = (date?: Date) => {
-    if (!date) {
-      return "TBD";
-    }
-    return new Date(date).toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  useEffect(() => {
+    refreshEvents();
+  }, [refreshEvents]);
 
-  const formatTime = (date?: Date) => {
-    if (!date) {
-      return "";
-    }
-    return new Date(date).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatStatusBadge = (status: EventStatusEnum) => {
-    switch (status) {
-      case EventStatusEnum.DRAFT:
-        return "bg-gray-700 text-gray-200";
-      case EventStatusEnum.PUBLISHED:
-        return "bg-green-700 text-green-100";
-      case EventStatusEnum.CANCELLED:
-        return "bg-red-700 text-red-100";
-      case EventStatusEnum.COMPLETED:
-        return "bg-blue-700 text-blue-100";
-      default:
-        return "bg-gray-700 text-gray-200";
-    }
-  };
-
-  const handleOpenDeleteEventDialog = (eventToDelete: EventSummary) => {
+  const closeDeleteDialog = () => {
     setEventToDelete(undefined);
-    setEventToDelete(eventToDelete);
-    setDialogOpen(true);
-  };
-
-  const handleCancelDeleteEventDialog = () => {
-    setEventToDelete(undefined);
-    setEventToDelete(undefined);
-    setDialogOpen(false);
+    setDeleteEventError(undefined);
   };
 
   const handleDeleteEvent = async () => {
-    if (!eventToDelete || isLoading || !user?.access_token) {
+    if (!eventToDelete || !accessToken) {
       return;
     }
-
+    setIsDeleting(true);
     try {
       setDeleteEventError(undefined);
-      await deleteEvent(user.access_token, eventToDelete.id);
-      setEventToDelete(undefined);
-      setDialogOpen(false);
-      refreshEvents(user.access_token);
+      await deleteEvent(accessToken, eventToDelete.id);
+      closeDeleteDialog();
+      await refreshEvents();
     } catch (err) {
-      if (err instanceof Error) {
-        setDeleteEventError(err.message);
-      } else if (typeof err === "string") {
-        setDeleteEventError(err);
-      } else {
-        setDeleteEventError("An unknown error has occurred");
-      }
+      setDeleteEventError(errorMessage(err));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  if (error) {
+  const renderBody = () => {
+    if (error) {
+      return <PageState variant="error" message={error} />;
+    }
+    if (!events) {
+      return <PageState />;
+    }
+    if (events.content.length === 0) {
+      return (
+        <PageState
+          variant="empty"
+          title="No events yet"
+          message="Create your first event to start selling tickets."
+          action={
+            <Button asChild>
+              <Link to="/dashboard/events/create">Create event</Link>
+            </Button>
+          }
+        />
+      );
+    }
+
     return (
-      <div className="min-h-screen bg-black text-white">
-        <Alert variant="destructive" className="bg-gray-900 border-red-700">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+      <div className="flex flex-col gap-3">
+        {events.content.map((eventItem) => (
+          <Card
+            key={eventItem.id}
+            className="gap-4 p-5 md:flex-row md:items-start md:justify-between md:p-6"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-medium tracking-tight">
+                  {eventItem.name}
+                </h2>
+                <StatusBadge status={eventItem.status} />
+              </div>
+              <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm text-muted-foreground sm:grid-cols-2">
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">Venue</dt>
+                  <MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  <dd>{eventItem.venue}</dd>
+                </div>
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">Dates</dt>
+                  <Calendar aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  <dd>{formatDateRange(eventItem.start, eventItem.end)}</dd>
+                </div>
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">Sales period</dt>
+                  <Clock aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  <dd>{salesWindow(eventItem)}</dd>
+                </div>
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">Ticket types</dt>
+                  <Tag aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  <dd>
+                    {eventItem.ticketTypes
+                      .map(
+                        (ticketType) =>
+                          `${ticketType.name} · ${formatPrice(ticketType.price)}`,
+                      )
+                      .join(", ")}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/dashboard/events/update/${eventItem.id}`}>
+                  <Pencil />
+                  Edit
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="cursor-pointer text-danger hover:bg-danger-soft hover:text-danger"
+                onClick={() => setEventToDelete(eventItem)}
+              >
+                <Trash2 />
+                <span className="sr-only">Delete {eventItem.name}</span>
+              </Button>
+            </div>
+          </Card>
+        ))}
+        <div className="flex justify-center pt-5">
+          <SimplePagination pagination={events} onPageChange={setPage} />
+        </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="bg-black min-h-screen text-white">
-      <NavBar />
+    <DashboardLayout
+      title="Your events"
+      description="Everything you've created, drafts included."
+      actions={
+        <Button asChild>
+          <Link to="/dashboard/events/create">
+            <Plus />
+            Create event
+          </Link>
+        </Button>
+      }
+    >
+      {renderBody()}
 
-      <div className="max-w-lg mx-auto px-4">
-        {/* Title */}
-        <div className="py-8 px-4 flex justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Your Events</h1>
-            <p>Events you have created</p>
-          </div>
-          <div>
-            <Link to="/dashboard/events/create">
-              <Button className="bg-purple-700 hover:bg-purple-500 cursor-pointer">
-                Create Event
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Event Cards */}
-        <div className="space-y-2">
-          {events?.content.map((eventItem) => (
-            <Card className="bg-gray-900 border-gray-700 text-white">
-              <CardHeader>
-                <div className="flex justify-between">
-                  <h3 className="font-bold text-xl">{eventItem.name}</h3>
-                  <span
-                    className={`flex items-center px-2 py-1 rounded-lg text-xs ${formatStatusBadge(eventItem.status)}`}
-                  >
-                    {eventItem.status}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Event Start & End */}
-                <div className="flex space-x-2">
-                  <Calendar className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="font-medium">
-                      {formatDate(eventItem.start)} to{" "}
-                      {formatDate(eventItem.end)}
-                    </p>
-                    <p className="text-gray-400">
-                      {formatTime(eventItem.start)} -{" "}
-                      {formatTime(eventItem.end)}
-                    </p>
-                  </div>
-                </div>
-                {/* Sales start and end */}
-                <div className="flex space-x-2">
-                  <Clock className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <h4 className="font-medium">Sales Period</h4>
-                    <p className="text-gray-400">
-                      {formatDate(eventItem.salesStart)} to{" "}
-                      {formatDate(eventItem.salesEnd)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <MapPin className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{eventItem.venue}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Tag className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <h4 className="font-medium">Ticket Types</h4>
-                    <ul>
-                      {eventItem.ticketTypes.map((ticketType) => (
-                        <li
-                          key={ticketType.id}
-                          className="flex gap-2 text-gray-400"
-                        >
-                          <span>{ticketType.name}</span>
-                          <span>${ticketType.price}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-end gap-2">
-                <Link to={`/dashboard/events/update/${eventItem.id}`}>
-                  <Button
-                    type="button"
-                    className="bg-gray-700 hover:bg-gray-500 cursor-pointer"
-                  >
-                    <Edit />
-                  </Button>
-                </Link>
-                <Button
-                  type="button"
-                  className="bg-red-700/80 hover:bg-red-500 cursor-pointer"
-                  onClick={() => handleOpenDeleteEventDialog(eventItem)}
-                >
-                  <Trash />
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </div>
-      <div className="flex justify-center py-8">
-        {events && (
-          <SimplePagination pagination={events} onPageChange={setPage} />
-        )}
-      </div>
-      <AlertDialog open={dialogOpen}>
+      <AlertDialog
+        open={eventToDelete !== undefined}
+        onOpenChange={(open) => !open && closeDeleteDialog()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete your event '{eventToDelete?.name}' and cannot be
-              undone.
+              “{eventToDelete?.name}” and its ticket types will be removed. This
+              can't be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteEventError && (
-            <Alert variant="destructive" className="border-red-700">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
+            <Alert variant="destructive">
+              <AlertCircle />
+              <AlertTitle>Couldn't delete the event</AlertTitle>
               <AlertDescription>{deleteEventError}</AlertDescription>
             </Alert>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelDeleteEventDialog}>
-              Cancel
+            <AlertDialogCancel className="cursor-pointer">
+              Keep it
             </AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleDeleteEvent()}>
-              Continue
-            </AlertDialogAction>
+            {/* A plain button so the dialog stays open if the delete fails */}
+            <Button
+              variant="destructive"
+              className="cursor-pointer"
+              onClick={handleDeleteEvent}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting…" : "Delete event"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </DashboardLayout>
   );
 };
 
