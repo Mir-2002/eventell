@@ -8,7 +8,7 @@ const RandomEventImage: React.FC = () => {
     setImageSrc(`/event-image-${randomIndex}.webp`);
   }, []);
 
-  return <img src={imageSrc} alt="Random Event" className="object-cover" />;
+  return <img src={imageSrc} alt="" className="h-full w-full object-cover" />;
 };
 
 export default RandomEventImage;

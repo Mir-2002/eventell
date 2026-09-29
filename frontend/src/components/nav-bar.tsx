@@ -8,57 +8,102 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { LogOut } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
 import { useRoles } from "@/hooks/use-roles";
-import { Link } from "react-router";
+import { Link, NavLink, useNavigate } from "react-router";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
+
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  cn("transition-colors hover:text-ink", isActive && "text-ink");
 
 const NavBar: React.FC = () => {
-  const { user, signoutRedirect } = useAuth();
-  const { isOrganizer } = useRoles();
+  const { user, isAuthenticated, signinRedirect, signoutRedirect } = useAuth();
+  const { isOrganizer, isAttendee, isStaff } = useRoles();
+  const navigate = useNavigate();
 
   return (
-    <div className="bg-gray-950 border-b border-gray-800 text-white">
-      <div className="container mx-auto p-4">
-        <div className="flex justify-between items-center">
-          <div className="flex gap-10 md:gap-20 items-center">
-            <h1 className="text-xl font-bold">Event Ticket Platform</h1>
-            <div className="text-gray-300 flex gap-8">
-              {isOrganizer && <Link to="/dashboard/events">Events</Link>}
-              <Link to="/dashboard/tickets">Tickets</Link>
-            </div>
+    <nav className="sticky top-4 z-40 mx-auto mt-4 w-[calc(100%-32px)] max-w-5xl rounded-full bg-white/70 py-2 pr-2 pl-4 text-ink shadow-soft backdrop-blur-[20px]">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-6 md:gap-12">
+          <Link to="/" className="flex shrink-0 items-center gap-2">
+            <span className="flex size-7 items-center justify-center rounded-full bg-coral">
+              <span className="size-2 rounded-full bg-white" />
+            </span>
+            <span className="text-lg font-semibold tracking-tight">
+              Eventell
+            </span>
+          </Link>
+          <div className="flex gap-4 text-sm font-medium text-muted-foreground sm:gap-6">
+            {isOrganizer && (
+              <NavLink to="/dashboard/events" className={navLinkClass}>
+                Events
+              </NavLink>
+            )}
+            {isAttendee && (
+              <NavLink to="/dashboard/tickets" className={navLinkClass}>
+                Tickets
+              </NavLink>
+            )}
+            {isStaff && (
+              <NavLink to="/dashboard/validate-qr" className={navLinkClass}>
+                Validate
+              </NavLink>
+            )}
+            {!isAuthenticated && (
+              <NavLink to="/organizers" className={navLinkClass}>
+                For organizers
+              </NavLink>
+            )}
           </div>
+        </div>
 
+        {isAuthenticated ? (
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-gray-700">
+            <DropdownMenuTrigger
+              className="cursor-pointer rounded-full"
+              aria-label="Account menu"
+            >
+              <Avatar className="size-9">
+                <AvatarFallback className="bg-ink text-xs text-white">
                   {user?.profile?.preferred_username?.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-56 bg-gray-900 border-gray-700 text-white"
+              className="w-56 rounded-2xl shadow-soft"
               align="end"
             >
               <DropdownMenuLabel className="font-normal">
                 <p className="text-sm font-medium">
                   {user?.profile?.preferred_username}
                 </p>
-                <p className="text-sm text-gray-400">{user?.profile?.email}</p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {user?.profile?.email}
+                </p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="hover:bg-gray-800"
-                onClick={() => signoutRedirect()}
-              >
+              <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                <LayoutDashboard />
+                <span>Dashboard</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => signoutRedirect()}>
                 <LogOut />
-                <span>Log Out</span>
+                <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        ) : (
+          <Button
+            variant="dark"
+            className="cursor-pointer"
+            onClick={() => signinRedirect()}
+          >
+            Log in
+          </Button>
+        )}
       </div>
-    </div>
+    </nav>
   );
 };
 

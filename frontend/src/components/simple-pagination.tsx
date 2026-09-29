@@ -10,33 +10,40 @@ interface SimplePaginationProps<T> {
 export function SimplePagination<T>({
   pagination,
   onPageChange,
-}: React.FC<SimplePaginationProps<T>>) {
+}: SimplePaginationProps<T>) {
   const currentPage = pagination.number;
   const totalPages = pagination.totalPages;
 
+  // Nothing to page through
+  if (totalPages <= 1) {
+    return null;
+  }
+
   return (
-    <div className="flex gap-2 items-center">
+    <nav aria-label="Pagination" className="flex items-center gap-3">
       <Button
-        size="sm"
+        variant="outline"
+        size="icon"
         className="cursor-pointer"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={pagination.first}
       >
-        <ChevronLeft className="h-4 w-4" />
-        <span className="sr-only">Previous Page</span>
+        <ChevronLeft />
+        <span className="sr-only">Previous page</span>
       </Button>
-      <div className="text-sm">
+      <div className="text-sm text-muted-foreground">
         Page {currentPage + 1} of {totalPages}
       </div>
       <Button
-        size="sm"
+        variant="outline"
+        size="icon"
         className="cursor-pointer"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={pagination.last}
       >
-        <ChevronRight className="h-4 w-4" />
-        <span className="sr-only">Next Page</span>
+        <ChevronRight />
+        <span className="sr-only">Next page</span>
       </Button>
-    </div>
+    </nav>
   );
 }
