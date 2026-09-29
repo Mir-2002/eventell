@@ -29,6 +29,8 @@ services:
     volumes:
       - keycloak-data:/opt/keycloak/data
       - ./keycloak:/opt/keycloak/data/import:ro
+      # Eventell login theme; build it with `npm run build-keycloak-theme` in ../keycloak-theme
+      - ../keycloak-theme/dist_keycloak:/opt/keycloak/providers:ro
     command:
       - start-dev
       - --db=dev-file

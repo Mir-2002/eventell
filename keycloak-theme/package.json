@@ -1,0 +1,29 @@
+{
+  "name": "eventell-keycloak-theme",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build-keycloak-theme": "npm run build && keycloakify build",
+    "format": "prettier . --write"
+  },
+  "dependencies": {
+    "keycloakify": "11.16.0",
+    "lucide-react": "^0.503.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react-swc": "^3.11.0",
+    "prettier": "^3.5.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~5.7.2",
+    "vite": "^6.4.3"
+  }
+}
