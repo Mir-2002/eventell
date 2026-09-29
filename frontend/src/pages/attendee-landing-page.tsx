@@ -1,148 +1,154 @@
-import { useAuth } from "react-oidc-context";
 import { Button } from "../components/ui/button";
-import { useNavigate } from "react-router";
 import { Input } from "@/components/ui/input";
-import { AlertCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PublishedEventSummary, SpringBootPagination } from "@/domain/domain";
 import { listPublishedEvents, searchPublishedEvents } from "@/lib/api";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import PublishedEventCard from "@/components/published-event-card";
 import { SimplePagination } from "@/components/simple-pagination";
+import BackgroundBlobs from "@/components/background-blobs";
+import NavBar from "@/components/nav-bar";
+import PageState from "@/components/page-state";
+import { errorMessage } from "@/lib/errors";
 
 const AttendeeLandingPage: React.FC = () => {
-  const { isAuthenticated, isLoading, signinRedirect, signoutRedirect } =
-    useAuth();
-
-  const navigate = useNavigate();
-
   const [page, setPage] = useState(0);
   const [publishedEvents, setPublishedEvents] = useState<
     SpringBootPagination<PublishedEventSummary> | undefined
   >();
   const [error, setError] = useState<string | undefined>();
-  const [query, setQuery] = useState<string | undefined>();
+  // What's typed vs. the search that was submitted
+  const [query, setQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
 
   useEffect(() => {
-    if (query && query.length > 0) {
-      queryPublishedEvents();
-    } else {
-      refreshPublishedEvents();
-    }
-  }, [page]);
-
-  const refreshPublishedEvents = async () => {
-    try {
-      setPublishedEvents(await listPublishedEvents(page));
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else if (typeof err === "string") {
-        setError(err);
-      } else {
-        setError("An unknown error has occurred");
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const result = submittedQuery
+          ? await searchPublishedEvents(submittedQuery, page)
+          : await listPublishedEvents(page);
+        if (!cancelled) {
+          setPublishedEvents(result);
+          setError(undefined);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(errorMessage(err));
+        }
       }
-    }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, submittedQuery]);
+
+  const submitSearch = () => {
+    setSubmittedQuery(query.trim());
+    setPage(0);
   };
-
-  const queryPublishedEvents = async () => {
-    if (!query) {
-      await refreshPublishedEvents();
-    }
-
-    try {
-      setPublishedEvents(await searchPublishedEvents(query, page));
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else if (typeof err === "string") {
-        setError(err);
-      } else {
-        setError("An unknown error has occurred");
-      }
-    }
-  };
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-black text-white">
-        <Alert variant="destructive" className="bg-gray-900 border-red-700">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return <p>Loading...</p>;
-  }
 
   return (
-    <div className="bg-black min-h-screen text-white">
-      {/* Nav */}
-      <div className="flex justify-end p-4 container mx-auto">
-        {isAuthenticated ? (
-          <div className="flex gap-4">
-            <Button
-              onClick={() => navigate("/dashboard")}
-              className="cursor-pointer"
-            >
-              Dashboard
-            </Button>
-            <Button
-              className="cursor-pointer"
-              onClick={() => signoutRedirect()}
-            >
-              Log out
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-4">
-            <Button className="cursor-pointer" onClick={() => signinRedirect()}>
-              Log in
-            </Button>
-          </div>
-        )}
-      </div>
+    <div className="min-h-screen pb-16">
+      <NavBar />
+
       {/* Hero */}
-      <div className="container mx-auto px-4 mb-8">
-        <div className="bg-[url(/organizers-landing-hero.png)] bg-cover min-h-[200px] rounded-lg bg-bottom md:min-h-[250px]">
-          <div className="bg-black/45 min-h-[200px] md:min-h-[250px] p-15 md:p-20">
-            <h1 className="text-2xl font-bold mb-4">
-              Find Tickets to Your Next Event
-            </h1>
-            <div className="flex gap-2 max-w-lg">
-              <Input
-                className="bg-white text-black"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <Button onClick={queryPublishedEvents}>
-                <Search />
-              </Button>
-            </div>
-          </div>
+      <section className="relative isolate px-4 pt-20 pb-16 text-center md:pt-28 md:pb-24">
+        <BackgroundBlobs />
+        <div className="mx-auto max-w-3xl motion-safe:animate-reveal">
+          <h1 className="text-5xl font-medium tracking-tight text-ink md:text-7xl">
+            Find tickets to your next{" "}
+            <span className="font-accent text-6xl text-coral md:text-8xl">
+              adventure
+            </span>
+          </h1>
+          <p className="mx-auto mt-6 max-w-[500px] text-lg text-muted-foreground">
+            Concerts, talks and meetups worth leaving the house for. Browse
+            what's on and get your ticket in a few taps.
+          </p>
+          <form
+            className="mx-auto mt-10 flex max-w-lg gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitSearch();
+            }}
+          >
+            <Input
+              aria-label="Search events"
+              placeholder="Search events"
+              className="h-12 bg-white shadow-soft"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Search"
+              className="size-12 cursor-pointer"
+            >
+              <Search />
+            </Button>
+          </form>
         </div>
-      </div>
+      </section>
 
       {/* Published Event Cards */}
-      <div className="grid grid-cols-2 gap-4 px-4 md:grid-cols-4">
-        {publishedEvents?.content?.map((publishedEvent) => (
-          <PublishedEventCard
-            publishedEvent={publishedEvent}
-            key={publishedEvent.id}
+      <section className="container mx-auto px-4 motion-safe:animate-reveal">
+        <h2 className="mb-6 text-2xl font-medium tracking-tight">
+          {submittedQuery
+            ? `Results for “${submittedQuery}”`
+            : "Upcoming events"}
+        </h2>
+        {error ? (
+          <PageState variant="error" message={error} />
+        ) : !publishedEvents ? (
+          <PageState />
+        ) : publishedEvents.content.length === 0 ? (
+          <PageState
+            variant="empty"
+            title={
+              submittedQuery ? "No events match that search" : "No events yet"
+            }
+            message={
+              submittedQuery
+                ? "Try a different name or venue."
+                : "Check back soon, new events are on their way."
+            }
+            action={
+              submittedQuery && (
+                <Button
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={() => {
+                    setQuery("");
+                    setSubmittedQuery("");
+                    setPage(0);
+                  }}
+                >
+                  Clear search
+                </Button>
+              )
+            }
           />
-        ))}
-      </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 md:grid-cols-4">
+            {publishedEvents.content.map((publishedEvent) => (
+              <PublishedEventCard
+                publishedEvent={publishedEvent}
+                key={publishedEvent.id}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-      {publishedEvents && (
-        <div className="w-full flex justify-center py-8">
+      {publishedEvents && !error && (
+        <div className="flex w-full justify-center py-8">
           <SimplePagination
             pagination={publishedEvents}
             onPageChange={setPage}
-          />{" "}
+          />
         </div>
       )}
     </div>

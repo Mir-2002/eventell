@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { useAuth } from "react-oidc-context";
 import { useNavigate } from "react-router";
+import PublicCentered from "@/components/public-centered";
+import PageState from "@/components/page-state";
+import { Button } from "@/components/ui/button";
 
 const CallbackPage: React.FC = () => {
   const { isLoading, isAuthenticated, error } = useAuth();
@@ -14,26 +17,34 @@ const CallbackPage: React.FC = () => {
     if (isAuthenticated) {
       const redirectPath = localStorage.getItem("redirectPath");
       localStorage.removeItem("redirectPath");
-      navigate(redirectPath ?? "/dashboard");
+      navigate(redirectPath ?? "/dashboard", { replace: true });
     } else if (!error) {
-      navigate("/login");
+      navigate("/login", { replace: true });
     }
   }, [isLoading, isAuthenticated, error, navigate]);
 
-  if (isLoading) {
-    return <p>Processing login...</p>;
-  }
-
-  if (error) {
-    return (
-      <div>
-        <p>Login failed: {error.message}</p>
-        <button onClick={() => navigate("/login")}>Try again</button>
-      </div>
-    );
-  }
-
-  return <p>Completing login...</p>;
+  return (
+    <PublicCentered showNav={false}>
+      {error ? (
+        <PageState
+          variant="error"
+          title="Login failed"
+          message={error.message}
+          action={
+            <Button
+              variant="dark"
+              className="cursor-pointer"
+              onClick={() => navigate("/login")}
+            >
+              Try again
+            </Button>
+          }
+        />
+      ) : (
+        <PageState title="Signing you in…" />
+      )}
+    </PublicCentered>
+  );
 };
 
 export default CallbackPage;

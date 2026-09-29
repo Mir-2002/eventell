@@ -1,23 +1,24 @@
 import RandomEventImage from "@/components/random-event-image";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import BackgroundBlobs from "@/components/background-blobs";
+import NavBar from "@/components/nav-bar";
+import PageState from "@/components/page-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   PublishedEventDetails,
   PublishedEventTicketTypeDetails,
 } from "@/domain/domain";
-import { getPublishedEvent } from "@/lib/api";
-import { AlertCircle, MapPin } from "lucide-react";
+import { ApiError, getPublishedEvent } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+import { formatDateRange, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { Calendar, Check, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useAuth } from "react-oidc-context";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
 const PublishedEventsPage: React.FC = () => {
-  const { isAuthenticated, isLoading, signinRedirect, signoutRedirect } =
-    useAuth();
-  const navigate = useNavigate();
   const { id } = useParams();
   const [error, setError] = useState<string | undefined>();
+  const [isNotFound, setIsNotFound] = useState(false);
   const [publishedEvent, setPublishedEvent] = useState<
     PublishedEventDetails | undefined
   >();
@@ -27,143 +28,175 @@ const PublishedEventsPage: React.FC = () => {
 
   useEffect(() => {
     if (!id) {
-      setError("ID must be provided!");
+      setIsNotFound(true);
       return;
     }
 
-    const doUseEffect = async () => {
+    const load = async () => {
       try {
         const eventData = await getPublishedEvent(id);
         setPublishedEvent(eventData);
-        if (eventData.ticketTypes.length > 0) {
-          setSelectedTicketType(eventData.ticketTypes[0]);
-        }
+        setSelectedTicketType(eventData.ticketTypes[0]);
       } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else if (typeof err === "string") {
-          setError(err);
+        // Unknown ids come back as 404, malformed ones as 400 or 500
+        if (err instanceof ApiError && err.status < 500) {
+          setIsNotFound(true);
         } else {
-          setError("An unknown error has occurred");
+          setError(errorMessage(err));
         }
       }
     };
-    doUseEffect();
+    load();
   }, [id]);
 
-  if (error) {
+  const renderBody = () => {
+    if (isNotFound) {
+      return (
+        <PageState
+          variant="empty"
+          title="We couldn't find that event"
+          message="It may have ended or been unpublished."
+          action={
+            <Button asChild variant="outline">
+              <Link to="/">Browse events</Link>
+            </Button>
+          }
+        />
+      );
+    }
+    if (error) {
+      return <PageState variant="error" message={error} />;
+    }
+    if (!publishedEvent) {
+      return <PageState />;
+    }
+
     return (
-      <div className="min-h-screen bg-black text-white">
-        <Alert variant="destructive" className="bg-gray-900 border-red-700">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return <p>Loading...</p>;
-  }
-
-  return (
-    <div className="bg-black min-h-screen text-white">
-      {/* Nav */}
-      <div className="flex justify-end p-4 container mx-auto">
-        {isAuthenticated ? (
-          <div className="flex gap-4">
-            <Button
-              onClick={() => navigate("/dashboard/events")}
-              className="cursor-pointer"
-            >
-              Dashboard
-            </Button>
-            <Button
-              className="cursor-pointer"
-              onClick={() => signoutRedirect()}
-            >
-              Log out
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-4">
-            <Button className="cursor-pointer" onClick={() => signinRedirect()}>
-              Log in
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <main className="container mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="grid grid-cols-2 gap-8 max-w-5xl mx-auto mb-8">
-          {/* Left Column */}
-          <div className="space-y-4">
-            <h1 className="text-3xl font-bold">{publishedEvent?.name}</h1>
-            <p className="text-lg flex gap-2 text-gray-300">
-              <MapPin />
-              {publishedEvent?.venue}
-            </p>
-          </div>
-          {/* Right Column */}
-          <div className="bg-gray-600 rounded-lg w-full max-w-sm overflow-hidden">
-            <RandomEventImage />
-          </div>
-        </div>
-
-        <h2 className="text-2xl font-bold mb-6">Available Tickets</h2>
-        <div className="flex gap-2">
-          {/* Left */}
-          <div className="w-1/2">
-            {publishedEvent?.ticketTypes?.map((ticketType) => (
-              <Card
-                className="bg-gray-800 border-gray-600 hover:bg-gray-700 text-white cursor-pointer gap-0 mb-2"
-                key={ticketType.id}
-                onClick={() => setSelectedTicketType(ticketType)}
-              >
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">{ticketType.name}</h3>
-                    <span className="text-xl font-bold ">
-                      ${ticketType.price}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-300 text-sm">
-                    {ticketType.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Right */}
-          <div className="w-1/2 text-white">
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-600">
-              <h2 className="text-2xl font-bold">{selectedTicketType?.name}</h2>
-              <div className="mb-6">
-                <span className="text-3xl font-bold">
-                  ${selectedTicketType?.price}
-                </span>
-              </div>
-              <div className="mb-6">
-                <p className="text-gray-300">
-                  {selectedTicketType?.description}
+      <>
+        {/* Hero */}
+        <section className="relative isolate px-4 pt-16 pb-12 md:pt-24 md:pb-16">
+          <BackgroundBlobs />
+          <div className="mx-auto grid max-w-5xl items-center gap-10 motion-safe:animate-reveal md:grid-cols-[1.2fr_1fr]">
+            <div>
+              <p className="text-lg font-medium text-muted-foreground">
+                You're{" "}
+                <span className="font-accent text-4xl text-ink">invited</span>
+              </p>
+              <h1 className="mt-2 text-5xl font-medium tracking-tight text-ink md:text-7xl">
+                {publishedEvent.name}
+              </h1>
+              <div className="mt-6 flex flex-col gap-3 text-muted-foreground">
+                <p className="flex items-start gap-2">
+                  <MapPin aria-hidden className="mt-0.5 size-5 shrink-0" />
+                  {publishedEvent.venue}
+                </p>
+                <p className="flex items-start gap-2">
+                  <Calendar aria-hidden className="mt-0.5 size-5 shrink-0" />
+                  {formatDateRange(publishedEvent.start, publishedEvent.end)}
                 </p>
               </div>
-              <Link
-                to={`/events/${publishedEvent?.id}/purchase/${selectedTicketType?.id}`}
-              >
-                <Button className="w-full bg-purple-600 hover:bg-purple-700 cursor-pointer">
-                  Purchase Ticket
-                </Button>
-              </Link>
+            </div>
+            <div className="aspect-[4/3] overflow-hidden rounded-[2rem] shadow-soft">
+              <RandomEventImage />
             </div>
           </div>
-        </div>
-      </main>
+        </section>
+
+        {/* Tickets */}
+        <section className="mx-auto max-w-5xl px-4 motion-safe:animate-reveal">
+          <h2 className="mb-6 text-2xl font-medium tracking-tight">
+            Choose your ticket
+          </h2>
+          {publishedEvent.ticketTypes.length === 0 ? (
+            <PageState
+              variant="empty"
+              title="Tickets aren't on sale yet"
+              message="Check back closer to the event."
+            />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
+              <div
+                role="radiogroup"
+                aria-label="Ticket types"
+                className="flex flex-col gap-3"
+              >
+                {publishedEvent.ticketTypes.map((ticketType) => {
+                  const isSelected = selectedTicketType?.id === ticketType.id;
+                  return (
+                    <button
+                      key={ticketType.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => setSelectedTicketType(ticketType)}
+                      className={cn(
+                        "flex cursor-pointer items-start justify-between gap-4 rounded-3xl border bg-white p-5 text-left shadow-soft transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                        isSelected
+                          ? "border-coral"
+                          : "border-stone-100 hover:border-stone-200",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+                            isSelected
+                              ? "border-coral bg-coral text-ink"
+                              : "border-stone-200",
+                          )}
+                        >
+                          {isSelected && <Check className="size-3" />}
+                        </span>
+                        <div>
+                          <h3 className="font-medium">{ticketType.name}</h3>
+                          {ticketType.description && (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {ticketType.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-lg font-medium">
+                        {formatPrice(ticketType.price)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedTicketType && (
+                <aside className="h-fit rounded-[2rem] bg-sage p-6 md:sticky md:top-24 md:p-8">
+                  <p className="text-sm text-muted-foreground">Your pick</p>
+                  <h3 className="mt-1 text-2xl font-medium tracking-tight">
+                    {selectedTicketType.name}
+                  </h3>
+                  <p className="mt-4 text-4xl font-medium tracking-tight">
+                    {formatPrice(selectedTicketType.price)}
+                  </p>
+                  <Button asChild size="lg" className="mt-8 w-full">
+                    <Link
+                      to={`/events/${publishedEvent.id}/purchase/${selectedTicketType.id}`}
+                    >
+                      Get tickets
+                    </Link>
+                  </Button>
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    You'll be asked to log in first.
+                  </p>
+                </aside>
+              )}
+            </div>
+          )}
+        </section>
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen pb-16">
+      <NavBar />
+      {renderBody()}
     </div>
   );
 };

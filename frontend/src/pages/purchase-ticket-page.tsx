@@ -1,121 +1,181 @@
+import BackgroundBlobs from "@/components/background-blobs";
+import NavBar from "@/components/nav-bar";
+import PageState from "@/components/page-state";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { purchaseTicket } from "@/lib/api";
-import { CheckCircle, CreditCard } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { PublishedEventDetails } from "@/domain/domain";
+import { getPublishedEvent, purchaseTicket } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+import { formatDateRange, formatPrice } from "@/lib/format";
+import { AlertCircle, Calendar, Check, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
 const PurchaseTicketPage: React.FC = () => {
   const { eventId, ticketTypeId } = useParams();
-  const { isLoading, user } = useAuth();
-  const navigate = useNavigate();
-  const [error, setError] = useState<string | undefined>();
-  const [isPurchaseSuccess, setIsPurchaseASuccess] = useState(false);
+  const { user } = useAuth();
+  const [publishedEvent, setPublishedEvent] = useState<
+    PublishedEventDetails | undefined
+  >();
+  const [loadError, setLoadError] = useState<string | undefined>();
+  const [purchaseError, setPurchaseError] = useState<string | undefined>();
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isPurchaseSuccess, setIsPurchaseSuccess] = useState(false);
 
   useEffect(() => {
-    if (!isPurchaseSuccess) {
+    if (!eventId) {
       return;
     }
-    const timer = setTimeout(() => {
-      navigate("/");
-    }, 3000);
+    getPublishedEvent(eventId)
+      .then(setPublishedEvent)
+      .catch((err) => setLoadError(errorMessage(err)));
+  }, [eventId]);
 
-    return () => clearTimeout(timer);
-  }, [isPurchaseSuccess]);
+  const ticketType = publishedEvent?.ticketTypes.find(
+    (type) => type.id === ticketTypeId,
+  );
 
   const handlePurchase = async () => {
-    if (isLoading || !user?.access_token || !eventId || !ticketTypeId) {
+    if (!user?.access_token || !eventId || !ticketTypeId) {
       return;
     }
+    setIsPurchasing(true);
+    setPurchaseError(undefined);
     try {
       await purchaseTicket(user.access_token, eventId, ticketTypeId);
-      setIsPurchaseASuccess(true);
+      setIsPurchaseSuccess(true);
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else if (typeof err === "string") {
-        setError(err);
-      } else {
-        setError("An unknown error occurred");
-      }
+      setPurchaseError(errorMessage(err));
+    } finally {
+      setIsPurchasing(false);
     }
   };
 
-  if (isPurchaseSuccess) {
-    return (
-      <div className="bg-black min-h-screen text-white flex items-center">
-        <div className="max-w-md mx-auto p-8 text-center">
-          <div className="bg-white p-8 rounded-lg border border-gray-200 shadow-sm text-black">
-            <div className="space-y-2">
-              <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
-              <h2 className="text-2xl font-bold text-green-600">Thank you!</h2>
-              <p className="text-gray-600">
-                Your ticket purchase was successful.
-              </p>
-              <p className="text-gray-600 text-sm">
-                Redirecting to home page in a few seconds...
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const renderBody = () => {
+    if (loadError || (publishedEvent && !ticketType)) {
+      return (
+        <PageState
+          variant={loadError ? "error" : "empty"}
+          title={loadError ? undefined : "That ticket isn't available"}
+          message={loadError ?? "It may have been removed by the organizer."}
+          action={
+            <Button asChild variant="outline">
+              <Link to={eventId ? `/events/${eventId}` : "/"}>
+                Back to the event
+              </Link>
+            </Button>
+          }
+        />
+      );
+    }
+    if (!publishedEvent || !ticketType) {
+      return <PageState />;
+    }
 
-  return (
-    <div className="bg-black min-h-screen text-white">
-      <div className="max-w-md mx-auto py-20">
-        <div className="bg-white border-gray-300 shadow-sm border rounded-lg space-y-4 p-6">
-          {error && (
-            <div className="border border-red-200 rounded-lg p-4 bg-red-50">
-              <div className="text-red-500 text-sm">
-                <strong>Error:</strong> {error}
-              </div>
-            </div>
-          )}
-
-          {/* Credit Card Number */}
-          <div className="space-y-2">
-            <Label className="text-gray-600">Credit Card Number</Label>
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder="1234 5678 9012 3456"
-                maxLength={19}
-                className="bg-gray-200 text-black pl-10"
-              />
-              <CreditCard className="absolute h-4 w-4 text-gray-400 top-2.5 left-3" />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-gray-600">Cardholder Name </Label>
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder="John Smith"
-                className="bg-gray-200 text-black pl-10"
-              />
-              <CreditCard className="absolute h-4 w-4 text-gray-400 top-2.5 left-3" />
-            </div>
-          </div>
-
-          <div className="flex justify-center">
-            <Button
-              className="bg-purple-500 hover:bg-purple-800 cursor-pointer"
-              onClick={handlePurchase}
-            >
-              Purchase Ticket
+    if (isPurchaseSuccess) {
+      return (
+        <Card className="items-center gap-4 p-8 text-center md:p-10">
+          <span className="flex size-14 items-center justify-center rounded-full bg-sage text-success">
+            <Check aria-hidden className="size-7" />
+          </span>
+          <h1 className="text-4xl font-medium tracking-tight md:text-5xl">
+            You're{" "}
+            <span className="font-accent text-5xl text-coral md:text-6xl">
+              going
+            </span>
+          </h1>
+          <p className="text-muted-foreground">
+            Your {ticketType.name} ticket for {publishedEvent.name} is ready.
+            Show its QR code at the door.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Button asChild variant="dark" size="lg">
+              <Link to="/dashboard/tickets">View my tickets</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link to="/">Browse more events</Link>
             </Button>
           </div>
+        </Card>
+      );
+    }
 
-          <div className="text-gray-500 text-xs flex items-center justify-center">
-            This is a mock page, no payment details should be entered.
+    return (
+      <>
+        <h1 className="mb-8 text-center text-5xl font-medium tracking-tight md:text-6xl">
+          Almost{" "}
+          <span className="font-accent text-6xl text-coral md:text-7xl">
+            there
+          </span>
+        </h1>
+        <Card className="gap-0 overflow-hidden py-0">
+          <div className="border-b border-stone-100 p-6 md:p-8">
+            <p className="text-sm text-muted-foreground">Event</p>
+            <h2 className="mt-1 text-2xl font-medium tracking-tight">
+              {publishedEvent.name}
+            </h2>
+            <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
+              <p className="flex items-start gap-2">
+                <MapPin aria-hidden className="mt-0.5 size-4 shrink-0" />
+                {publishedEvent.venue}
+              </p>
+              <p className="flex items-start gap-2">
+                <Calendar aria-hidden className="mt-0.5 size-4 shrink-0" />
+                {formatDateRange(publishedEvent.start, publishedEvent.end)}
+              </p>
+            </div>
           </div>
+          <div className="flex items-start justify-between gap-4 p-6 md:p-8">
+            <div>
+              <p className="text-sm text-muted-foreground">Ticket</p>
+              <p className="mt-1 font-medium">{ticketType.name}</p>
+              {ticketType.description && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {ticketType.description}
+                </p>
+              )}
+            </div>
+            <p className="shrink-0 text-2xl font-medium tracking-tight">
+              {formatPrice(ticketType.price)}
+            </p>
+          </div>
+          <div className="flex flex-col gap-4 bg-stone-50 p-6 md:p-8">
+            {purchaseError && (
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertTitle>We couldn't get your ticket</AlertTitle>
+                <AlertDescription>{purchaseError}</AlertDescription>
+              </Alert>
+            )}
+            <Button
+              variant="dark"
+              size="lg"
+              className="h-12 w-full cursor-pointer"
+              onClick={handlePurchase}
+              disabled={isPurchasing}
+            >
+              {isPurchasing ? "Confirming…" : "Confirm purchase"}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              This is a demo: no payment is taken.
+            </p>
+          </div>
+        </Card>
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen pb-16">
+      <NavBar />
+      <main className="relative isolate px-4 pt-16 md:pt-24">
+        <BackgroundBlobs />
+        <div className="mx-auto max-w-xl motion-safe:animate-reveal">
+          {renderBody()}
         </div>
-      </div>
+      </main>
     </div>
   );
 };
