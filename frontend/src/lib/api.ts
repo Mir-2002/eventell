@@ -2,7 +2,7 @@ import {
   CreateEventRequest,
   EventDetails,
   EventSummary,
-  isErrorResponse,
+  getErrorMessage,
   PublishedEventDetails,
   PublishedEventSummary,
   SpringBootPagination,
@@ -13,328 +13,161 @@ import {
   UpdateEventRequest,
 } from "@/domain/domain";
 
-export const createEvent = async (
-  accessToken: string,
-  request: CreateEventRequest,
-): Promise<void> => {
-  const response = await fetch("/api/v1/events", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(request),
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const statusMessages: Record<number, string> = {
+  401: "Your session has expired. Please log in again.",
+  403: "You don't have permission to do that.",
+  404: "We couldn't find what you were looking for.",
+};
+
+interface RequestOptions {
+  method?: "GET" | "POST" | "PUT" | "DELETE";
+  accessToken?: string;
+  body?: unknown;
+}
+
+const send = async (
+  path: string,
+  { method = "GET", accessToken, body }: RequestOptions,
+): Promise<Response> => {
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const response = await fetch(path, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-  const responseBody = await response.json();
-
   if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
+    // Error bodies are optional: Spring Security's 401/403 and some 404s are empty
+    const text = await response.text();
+    let message: string | undefined;
+    try {
+      message = text ? getErrorMessage(JSON.parse(text)) : undefined;
+    } catch {
+      message = undefined;
     }
+    if (!message) {
+      console.error(`${method} ${path} failed with ${response.status}`, text);
+    }
+    throw new ApiError(
+      response.status,
+      message ?? statusMessages[response.status] ?? "An unknown error occurred",
+    );
   }
+
+  return response;
 };
+
+const request = async <T>(path: string, options: RequestOptions = {}) => {
+  const response = await send(path, options);
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+};
+
+const query = (params: Record<string, string | number | undefined>) =>
+  new URLSearchParams(
+    Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== "")
+      .map(([key, value]) => [key, String(value)]),
+  ).toString();
+
+export const createEvent = async (
+  accessToken: string,
+  body: CreateEventRequest,
+): Promise<EventDetails> =>
+  request("/api/v1/events", { method: "POST", accessToken, body });
 
 export const updateEvent = async (
   accessToken: string,
   id: string,
-  request: UpdateEventRequest,
-): Promise<void> => {
-  const response = await fetch(`/api/v1/events/${id}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(request),
-  });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-};
+  body: UpdateEventRequest,
+): Promise<EventDetails> =>
+  request(`/api/v1/events/${id}`, { method: "PUT", accessToken, body });
 
 export const listEvents = async (
   accessToken: string,
   page: number,
-): Promise<SpringBootPagination<EventSummary>> => {
-  const response = await fetch(`/api/v1/events?page=${page}&size=2`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as SpringBootPagination<EventSummary>;
-};
+): Promise<SpringBootPagination<EventSummary>> =>
+  request(`/api/v1/events?${query({ page, size: 10 })}`, { accessToken });
 
 export const getEvent = async (
   accessToken: string,
   id: string,
-): Promise<EventDetails> => {
-  const response = await fetch(`/api/v1/events/${id}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as EventDetails;
-};
+): Promise<EventDetails> => request(`/api/v1/events/${id}`, { accessToken });
 
 export const deleteEvent = async (
   accessToken: string,
   id: string,
-): Promise<void> => {
-  const response = await fetch(`/api/v1/events/${id}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const responseBody = await response.json();
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-};
+): Promise<void> =>
+  request(`/api/v1/events/${id}`, { method: "DELETE", accessToken });
 
 export const listPublishedEvents = async (
   page: number,
-): Promise<SpringBootPagination<PublishedEventSummary>> => {
-  const response = await fetch(`/api/v1/published-events?page=${page}&size=4`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as SpringBootPagination<PublishedEventSummary>;
-};
+): Promise<SpringBootPagination<PublishedEventSummary>> =>
+  request(`/api/v1/published-events?${query({ page, size: 8 })}`);
 
 export const searchPublishedEvents = async (
-  query: string,
+  q: string,
   page: number,
-): Promise<SpringBootPagination<PublishedEventSummary>> => {
-  const response = await fetch(
-    `/api/v1/published-events?q=${query}&page=${page}&size=4`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as SpringBootPagination<PublishedEventSummary>;
-};
+): Promise<SpringBootPagination<PublishedEventSummary>> =>
+  request(`/api/v1/published-events?${query({ q: q.trim(), page, size: 8 })}`);
 
 export const getPublishedEvent = async (
   id: string,
-): Promise<PublishedEventDetails> => {
-  const response = await fetch(`/api/v1/published-events/${id}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as PublishedEventDetails;
-};
+): Promise<PublishedEventDetails> => request(`/api/v1/published-events/${id}`);
 
 export const purchaseTicket = async (
   accessToken: string,
   eventId: string,
   ticketTypeId: string,
-): Promise<void> => {
-  const response = await fetch(
-    `/api/v1/events/${eventId}/ticket-types/${ticketTypeId}/tickets`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const responseBody = await response.json();
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-};
+): Promise<void> =>
+  request(`/api/v1/events/${eventId}/ticket-types/${ticketTypeId}/tickets`, {
+    method: "POST",
+    accessToken,
+  });
 
 export const listTickets = async (
   accessToken: string,
   page: number,
-): Promise<SpringBootPagination<TicketSummary>> => {
-  const response = await fetch(`/api/v1/tickets?page=${page}&size=8`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as SpringBootPagination<TicketSummary>;
-};
+): Promise<SpringBootPagination<TicketSummary>> =>
+  request(`/api/v1/tickets?${query({ page, size: 9 })}`, { accessToken });
 
 export const getTicket = async (
   accessToken: string,
   id: string,
-): Promise<TicketDetails> => {
-  const response = await fetch(`/api/v1/tickets/${id}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as TicketDetails;
-};
+): Promise<TicketDetails> => request(`/api/v1/tickets/${id}`, { accessToken });
 
 export const getTicketQr = async (
   accessToken: string,
   id: string,
 ): Promise<Blob> => {
-  const response = await fetch(`/api/v1/tickets/${id}/qr-codes`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const response = await send(`/api/v1/tickets/${id}/qr-codes`, {
+    accessToken,
   });
-
-  if (response.ok) {
-    return await response.blob();
-  } else {
-    throw new Error("Unable to get ticket QR code");
-  }
+  return response.blob();
 };
 
 export const validateTicket = async (
   accessToken: string,
-  request: TicketValidationRequest,
-): Promise<TicketValidationResponse> => {
-  const response = await fetch(`/api/v1/ticket-validations`, {
+  body: TicketValidationRequest,
+): Promise<TicketValidationResponse> =>
+  request("/api/v1/ticket-validations", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(request),
+    accessToken,
+    body,
   });
-
-  const responseBody = await response.json();
-
-  if (!response.ok) {
-    if (isErrorResponse(responseBody)) {
-      throw new Error(responseBody.error);
-    } else {
-      console.error(JSON.stringify(responseBody));
-      throw new Error("An unknown error occurred");
-    }
-  }
-
-  return responseBody as Promise<TicketValidationResponse>;
-};

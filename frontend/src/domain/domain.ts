@@ -1,16 +1,15 @@
-export interface ErrorResponse {
-  error: string;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const isErrorResponse = (obj: any): obj is ErrorResponse => {
-  return (
-    obj &&
-    typeof obj === "object" &&
-    "error" in obj &&
-    typeof obj.error === "string"
-  );
+// The backend serialises its ErrorDto as {"Error": "..."}; accept either casing
+export const getErrorMessage = (obj: unknown): string | undefined => {
+  if (!obj || typeof obj !== "object") {
+    return undefined;
+  }
+  const record = obj as Record<string, unknown>;
+  const message = record.error ?? record.Error;
+  return typeof message === "string" ? message : undefined;
 };
+
+// Backend dates are LocalDateTime: ISO strings without a timezone, e.g. "2026-10-01T18:00:00"
+export type LocalDateTime = string;
 
 export enum EventStatusEnum {
   DRAFT = "DRAFT",
@@ -23,36 +22,36 @@ export interface CreateTicketTypeRequest {
   name: string;
   price: number;
   description: string;
-  totalAvailable?: number;
+  totalAvailable?: number | null;
 }
 
 export interface CreateEventRequest {
   name: string;
-  start?: Date;
-  end?: Date;
+  start?: LocalDateTime;
+  end?: LocalDateTime;
   venue: string;
-  salesStart?: Date;
-  salesEnd?: Date;
+  salesStart?: LocalDateTime;
+  salesEnd?: LocalDateTime;
   status: EventStatusEnum;
   ticketTypes: CreateTicketTypeRequest[];
 }
 
 export interface UpdateTicketTypeRequest {
-  id: string | undefined;
+  id: string | null;
   name: string;
   price: number;
   description: string;
-  totalAvailable?: number;
+  totalAvailable?: number | null;
 }
 
 export interface UpdateEventRequest {
   id: string;
   name: string;
-  start?: Date;
-  end?: Date;
+  start?: LocalDateTime;
+  end?: LocalDateTime;
   venue: string;
-  salesStart?: Date;
-  salesEnd?: Date;
+  salesStart?: LocalDateTime;
+  salesEnd?: LocalDateTime;
   status: EventStatusEnum;
   ticketTypes: UpdateTicketTypeRequest[];
 }
@@ -62,17 +61,17 @@ export interface TicketTypeSummary {
   name: string;
   price: number;
   description: string;
-  totalAvailable?: number;
+  totalAvailable?: number | null;
 }
 
 export interface EventSummary {
   id: string;
   name: string;
-  start?: Date;
-  end?: Date;
+  start?: LocalDateTime;
+  end?: LocalDateTime;
   venue: string;
-  salesStart?: Date;
-  salesEnd?: Date;
+  salesStart?: LocalDateTime;
+  salesEnd?: LocalDateTime;
   status: EventStatusEnum;
   ticketTypes: TicketTypeSummary[];
 }
@@ -80,8 +79,8 @@ export interface EventSummary {
 export interface PublishedEventSummary {
   id: string;
   name: string;
-  start?: Date;
-  end?: Date;
+  start?: LocalDateTime;
+  end?: LocalDateTime;
   venue: string;
 }
 
@@ -90,21 +89,21 @@ export interface TicketTypeDetails {
   name: string;
   price: number;
   description: string;
-  totalAvailable?: number;
+  totalAvailable?: number | null;
 }
 
 export interface EventDetails {
   id: string;
   name: string;
-  start?: Date;
-  end?: Date;
+  start?: LocalDateTime;
+  end?: LocalDateTime;
   venue: string;
-  salesStart?: Date;
-  salesEnd?: Date;
+  salesStart?: LocalDateTime;
+  salesEnd?: LocalDateTime;
   status: EventStatusEnum;
   ticketTypes: TicketTypeDetails[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: LocalDateTime;
+  updatedAt: LocalDateTime;
 }
 
 export interface SpringBootPagination<T> {
@@ -146,8 +145,8 @@ export interface PublishedEventTicketTypeDetails {
 export interface PublishedEventDetails {
   id: string;
   name: string;
-  start?: Date;
-  end?: Date;
+  start?: LocalDateTime;
+  end?: LocalDateTime;
   venue: string;
   ticketTypes: PublishedEventTicketTypeDetails[];
 }
@@ -176,8 +175,8 @@ export interface TicketDetails {
   description: string;
   eventName: string;
   eventVenue: string;
-  eventStart: Date;
-  eventEnd: Date;
+  eventStart?: LocalDateTime | null;
+  eventEnd?: LocalDateTime | null;
 }
 
 export enum TicketValidationMethod {
